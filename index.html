@@ -11,13 +11,13 @@
         .zh { display: block; font-weight: bold; }
         .en { font-size: 10px; color: #888; }
         .footer { position: fixed; bottom: 30px; width: 100%; text-align: center; }
-        input { padding: 12px; border-radius: 20px; border: 1px solid #000; width: 260px; }
+        input { padding: 12px; border-radius: 20px; border: 1px solid #000; width: 260px; outline: none; }
         #set-api { cursor: pointer; border: none; background: none; font-size: 20px; }
-        #loader { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); display: none; background: #000; color: #fff; padding: 10px; border-radius: 10px; }
+        #loader { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); display: none; background: #000; color: #fff; padding: 10px; border-radius: 10px; z-index: 99; }
     </style>
 </head>
 <body>
-    <div id="loader">思考中...</div>
+    <div id="loader">Gemini 正在联想...</div>
     <div id="canvas"></div>
     <div class="footer">
         <input type="text" id="in" placeholder="输入词语并回车...">
@@ -50,28 +50,37 @@
         }
 
         async function spread(word, x, y) {
-            if(!apiKey) return alert("请先设置Key");
+            if(!apiKey) return alert("请先设置 Key");
             document.getElementById('loader').style.display = 'block';
             
-            // 【加固型网址】防止截断
-            const domain = "https://generativelanguage.googleapis.com";
-            const path = "/v1beta/models/gemini-1.5-flash:generateContent";
-            const url = domain + path + "?key=" + apiKey;
+            // --- 核心修复：手动拼接，确保网址不被截断 ---
+            const base = "https://generativelanguage.googleapis.com";
+            const mid = "/v1beta/models/gemini-1.5-flash";
+            const action = ":generateContent"; 
+            const url = base + mid + action + "?key=" + apiKey;
 
             try {
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "给出8个和'" + word + "'相关的词,格式:中文(英文),逗号隔开" }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "给出8个和'" + word + "'相关的词,格式:中文(英文),用逗号隔开" }] }] })
                 });
                 const data = await res.json();
-                const text = data.candidates[0].content.parts[0].text;
-                text.split(/[,，]/).forEach((item, i) => {
-                    const a = (i / 8) * 6.28;
-                    const parts = item.split(/[()]/);
-                    addBubble(parts[0], parts[1] || "AI", x + Math.cos(a)*150, y + Math.sin(a)*150);
-                });
-            } catch (e) { alert("出错啦，请检查网络和Key"); }
+                if (data.candidates) {
+                    const text = data.candidates[0].content.parts[0].text;
+                    text.split(/[,，]/).forEach((item, i) => {
+                        const a = (i / 8) * 6.28;
+                        const parts = item.split(/[()]/);
+                        addBubble(parts[0], parts[1] || "AI", x + Math.cos(a)*160, y + Math.sin(a)*160);
+                    });
+                } else {
+                    console.error("API Error:", data);
+                    alert("Gemini 返回了错误，请检查 Key 或节点地区");
+                }
+            } catch (e) { 
+                console.error(e);
+                alert("请求失败，请确保梯子开启全局模式"); 
+            }
             document.getElementById('loader').style.display = 'none';
         }
     </script>
