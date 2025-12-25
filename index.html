@@ -4,24 +4,25 @@
     <meta charset="UTF-8">
     <title>创意发散助手</title>
     <style>
-        body { margin: 0; background: #ffffff; font-family: sans-serif; height: 100vh; overflow: hidden; }
+        body { margin: 0; background: #fdfdfd; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; }
         #canvas { width: 100%; height: 100%; position: relative; }
         .bubble {
-            position: absolute; padding: 12px 20px;
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(0, 0, 0, 0.1); border-radius: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-            transition: 0.3s; cursor: pointer; text-align: center;
+            position: absolute; padding: 15px 25px;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.1); border-radius: 40px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.05);
+            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); cursor: pointer; text-align: center;
             transform: translate(-50%, -50%);
         }
-        .bubble:hover { background: #FFD700; border-color: #000; transform: translate(-50%, -50%) scale(1.1); }
-        .zh { display: block; font-weight: bold; color: #000; }
-        .en { font-size: 10px; color: #666; text-transform: uppercase; }
-        .footer { position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 10px; }
-        input { padding: 12px 25px; border-radius: 25px; border: 2px solid #000; width: 300px; outline: none; }
-        #set-api { padding: 10px; background: #000; color: #fff; border-radius: 50%; cursor: pointer; border: none; font-size: 20px; }
-        #loader { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); display: none; background: #000; color: #FFD700; padding: 8px 20px; border-radius: 20px; }
+        .bubble:hover { background: #FFD700; border-color: #000; transform: translate(-50%, -50%) scale(1.15); box-shadow: 0 12px 40px rgba(255,215,0,0.3); }
+        .zh { display: block; font-weight: bold; color: #000; font-size: 16px; }
+        .en { font-size: 11px; color: #777; text-transform: uppercase; letter-spacing: 1px; }
+        .footer { position: fixed; bottom: 40px; width: 100%; display: flex; justify-content: center; gap: 15px; align-items: center; }
+        input { padding: 14px 28px; border-radius: 30px; border: 2px solid #000; width: 320px; outline: none; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        #set-api { width: 50px; height: 50px; background: #000; color: #fff; border-radius: 50%; cursor: pointer; border: none; font-size: 22px; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
+        #set-api:hover { transform: rotate(15deg) scale(1.1); }
+        #loader { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); display: none; background: #000; color: #FFD700; padding: 10px 25px; border-radius: 25px; font-weight: bold; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
@@ -38,7 +39,7 @@
 
         document.getElementById('set-api').onclick = () => {
             const key = prompt("请输入你的 Gemini API Key:");
-            if(key) { apiKey = key; alert("Key 已就绪！"); }
+            if(key) { apiKey = key.trim(); alert("Key 已就绪！"); }
         };
 
         input.onkeypress = (e) => {
@@ -58,17 +59,19 @@
         }
 
         async function spread(word, x, y) {
-            if(!apiKey) return alert("请点击右下角🔑设置 Key！");
+            if(!apiKey) return alert("请先点击🔑设置 API Key！");
             document.getElementById('loader').style.display = 'block';
             
-            // 修正后的标准网址格式
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            // 使用最完整且正确的 URL
+            const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
 
             try {
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `给出8个和"${word}"相关的创意词,格式:中文(英文),用逗号隔开,不要解释` }] }] })
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: `你是一个创意发散助手。请根据词语 "${word}" 给出8个相关的关联词。要求：每个词包含 中文(英文) 格式，用逗号隔开，不要解释。` }] }]
+                    })
                 });
 
                 const data = await response.json();
@@ -78,15 +81,17 @@
                     const keywords = aiText.split(/[,，]/).map(s => s.trim());
                     keywords.forEach((item, i) => {
                         const angle = (i / keywords.length) * Math.PI * 2;
+                        const dist = 180;
                         const parts = item.split(/[()（）]/);
-                        addBubble(parts[0], parts[1] || "Idea", x + Math.cos(angle)*160, y + Math.sin(angle)*160);
+                        addBubble(parts[0], parts[1] || "Idea", x + Math.cos(angle)*dist, y + Math.sin(angle)*dist);
                     });
                 } else {
-                    alert("Gemini 返回了错误，请检查 Key 是否有效。");
+                    console.error("API Error:", data);
+                    alert("Gemini 返回了错误，请检查 Key 的有效性或网络。");
                 }
             } catch (e) { 
-                console.error(e);
-                alert("联想失败，可能是网络问题。"); 
+                console.error("Fetch Error:", e);
+                alert("请求失败，请确保你的科学上网工具开启了“全局模式”。"); 
             }
             document.getElementById('loader').style.display = 'none';
         }
