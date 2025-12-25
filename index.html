@@ -6,36 +6,37 @@
     <style>
         body { margin: 0; background: #fdfdfd; font-family: sans-serif; height: 100vh; overflow: hidden; }
         #canvas { width: 100%; height: 100%; position: relative; }
-        .bubble { position: absolute; padding: 15px 25px; background: white; border: 1px solid #ddd; border-radius: 40px; cursor: pointer; transform: translate(-50%, -50%); transition: 0.3s; text-align: center; }
-        .bubble:hover { background: #FFD700; transform: translate(-50%, -50%) scale(1.1); }
-        .zh { display: block; font-weight: bold; }
-        .en { font-size: 10px; color: #888; }
-        .footer { position: fixed; bottom: 30px; width: 100%; text-align: center; }
-        input { padding: 12px; border-radius: 20px; border: 1px solid #000; width: 260px; outline: none; }
-        #set-api { cursor: pointer; border: none; background: none; font-size: 20px; }
-        #loader { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); display: none; background: #000; color: #fff; padding: 10px; border-radius: 10px; z-index: 99; }
+        .bubble { position: absolute; padding: 15px 25px; background: white; border: 1px solid #ddd; border-radius: 40px; cursor: pointer; transform: translate(-50%, -50%); transition: 0.3s; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .bubble:hover { background: #FFD700; border-color: #000; transform: translate(-50%, -50%) scale(1.1); }
+        .zh { display: block; font-weight: bold; font-size: 16px; }
+        .en { font-size: 10px; color: #888; text-transform: uppercase; }
+        .footer { position: fixed; bottom: 30px; width: 100%; text-align: center; display: flex; justify-content: center; gap: 10px; }
+        input { padding: 12px 20px; border-radius: 25px; border: 2px solid #000; width: 280px; outline: none; }
+        #set-api { cursor: pointer; border: none; background: #000; color: #fff; width: 45px; height: 45px; border-radius: 50%; font-size: 20px; }
+        #loader { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); display: none; background: #000; color: #FFD700; padding: 10px 20px; border-radius: 20px; z-index: 100; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="loader">Gemini 正在联想...</div>
+    <div id="loader">Gemini 正在联想中...</div>
     <div id="canvas"></div>
     <div class="footer">
-        <input type="text" id="in" placeholder="输入词语并回车...">
+        <input type="text" id="in" placeholder="输入灵感词汇并回车...">
         <button id="set-api">🔑</button>
     </div>
+
     <script>
         let apiKey = "";
         const canvas = document.getElementById('canvas');
         const input = document.getElementById('in');
 
         document.getElementById('set-api').onclick = () => {
-            const k = prompt("请输入 API Key:");
-            if(k) apiKey = k.trim();
+            const k = prompt("请输入你的 Gemini API Key:");
+            if(k) { apiKey = k.trim(); alert("Key 已就绪！"); }
         };
 
         input.onkeypress = (e) => {
-            if (e.key === 'Enter' && input.value) {
-                addBubble(input.value, "START", window.innerWidth/2, window.innerHeight/2);
+            if (e.key === 'Enter' && input.value.trim()) {
+                addBubble(input.value.trim(), "START", window.innerWidth/2, window.innerHeight/2);
                 input.value = "";
             }
         };
@@ -45,44 +46,36 @@
             b.className = 'bubble';
             b.style.left = x + 'px'; b.style.top = y + 'px';
             b.innerHTML = `<span class="zh">${zh}</span><span class="en">${en}</span>`;
-            b.onclick = () => spread(zh, x, y);
+            // 点击气泡触发联想
+            b.onclick = (event) => {
+                event.stopPropagation();
+                spread(zh, x, y);
+            };
             canvas.appendChild(b);
         }
 
         async function spread(word, x, y) {
-            if(!apiKey) return alert("请先设置 Key");
+            if(!apiKey) return alert("请先点击🔑设置 API Key！");
             document.getElementById('loader').style.display = 'block';
             
-            // --- 核心修复：手动拼接，确保网址不被截断 ---
-            const base = "https://generativelanguage.googleapis.com";
-            const mid = "/v1beta/models/gemini-1.5-flash";
-            const action = ":generateContent"; 
-            const url = base + mid + action + "?key=" + apiKey;
+            // 构造完整的 API 地址
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
             try {
-                const res = await fetch(url, {
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "给出8个和'" + word + "'相关的词,格式:中文(英文),用逗号隔开" }] }] })
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: `你是一个创意助手。请根据词语 "${word}" 给出8个相关的发散词。要求：格式为"中文(英文)"，用逗号隔开，不要有任何多余的解释。` }] }]
+                    })
                 });
-                const data = await res.json();
-                if (data.candidates) {
-                    const text = data.candidates[0].content.parts[0].text;
-                    text.split(/[,，]/).forEach((item, i) => {
-                        const a = (i / 8) * 6.28;
-                        const parts = item.split(/[()]/);
-                        addBubble(parts[0], parts[1] || "AI", x + Math.cos(a)*160, y + Math.sin(a)*160);
-                    });
-                } else {
-                    console.error("API Error:", data);
-                    alert("Gemini 返回了错误，请检查 Key 或节点地区");
-                }
-            } catch (e) { 
-                console.error(e);
-                alert("请求失败，请确保梯子开启全局模式"); 
-            }
-            document.getElementById('loader').style.display = 'none';
-        }
-    </script>
-</body>
-</html>
+
+                const data = await response.json();
+                
+                if (data.candidates && data.candidates[0]) {
+                    const aiText = data.candidates[0].content.parts[0].text;
+                    // 解析 AI 返回的文本
+                    const keywords = aiText.split(/[,，]/).map(s => s.trim());
+                    keywords.forEach((item, i) => {
+                        const angle = (i / keywords.length) * Math.PI * 2;
+                        const dist = 180; // 发散距离
