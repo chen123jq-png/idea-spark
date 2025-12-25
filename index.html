@@ -1,81 +1,51 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>创意发散助手</title>
+    <title>创意联想测试</title>
     <style>
-        body { margin: 0; background: #fdfdfd; font-family: sans-serif; height: 100vh; overflow: hidden; }
-        #canvas { width: 100%; height: 100%; position: relative; }
-        .bubble { position: absolute; padding: 15px 25px; background: white; border: 1px solid #ddd; border-radius: 40px; cursor: pointer; transform: translate(-50%, -50%); transition: 0.3s; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        .bubble:hover { background: #FFD700; border-color: #000; transform: translate(-50%, -50%) scale(1.1); }
-        .zh { display: block; font-weight: bold; font-size: 16px; }
-        .en { font-size: 10px; color: #888; text-transform: uppercase; }
-        .footer { position: fixed; bottom: 30px; width: 100%; text-align: center; display: flex; justify-content: center; gap: 10px; }
-        input { padding: 12px 20px; border-radius: 25px; border: 2px solid #000; width: 280px; outline: none; }
-        #set-api { cursor: pointer; border: none; background: #000; color: #fff; width: 45px; height: 45px; border-radius: 50%; font-size: 20px; }
-        #loader { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); display: none; background: #000; color: #FFD700; padding: 10px 20px; border-radius: 20px; z-index: 100; font-weight: bold; }
+        body { font-family: sans-serif; text-align: center; padding: 50px; }
+        input { padding: 10px; width: 200px; border-radius: 5px; border: 1px solid #ccc; }
+        button { padding: 10px 20px; cursor: pointer; background: #000; color: #fff; border: none; border-radius: 5px; }
+        #res { margin-top: 20px; color: #333; line-height: 2; }
     </style>
 </head>
 <body>
-    <div id="loader">Gemini 正在联想中...</div>
-    <div id="canvas"></div>
-    <div class="footer">
-        <input type="text" id="in" placeholder="输入灵感词汇并回车...">
-        <button id="set-api">🔑</button>
-    </div>
+    <h2>🚀 创意发散测试页</h2>
+    <input type="password" id="key" placeholder="在此粘贴你的 API Key">
+    <br><br>
+    <input type="text" id="word" placeholder="输入词语（如：咖啡）">
+    <button onclick="ask()">开始联想</button>
+    <div id="res">等待输入...</div>
 
     <script>
-        let apiKey = "";
-        const canvas = document.getElementById('canvas');
-        const input = document.getElementById('in');
-
-        document.getElementById('set-api').onclick = () => {
-            const k = prompt("请输入你的 Gemini API Key:");
-            if(k) { apiKey = k.trim(); alert("Key 已就绪！"); }
-        };
-
-        input.onkeypress = (e) => {
-            if (e.key === 'Enter' && input.value.trim()) {
-                addBubble(input.value.trim(), "START", window.innerWidth/2, window.innerHeight/2);
-                input.value = "";
-            }
-        };
-
-        function addBubble(zh, en, x, y) {
-            const b = document.createElement('div');
-            b.className = 'bubble';
-            b.style.left = x + 'px'; b.style.top = y + 'px';
-            b.innerHTML = `<span class="zh">${zh}</span><span class="en">${en}</span>`;
-            // 点击气泡触发联想
-            b.onclick = (event) => {
-                event.stopPropagation();
-                spread(zh, x, y);
-            };
-            canvas.appendChild(b);
-        }
-
-        async function spread(word, x, y) {
-            if(!apiKey) return alert("请先点击🔑设置 API Key！");
-            document.getElementById('loader').style.display = 'block';
+        async function ask() {
+            const key = document.getElementById('key').value.trim();
+            const word = document.getElementById('word').value.trim();
+            const resDiv = document.getElementById('res');
+            if(!key || !word) return alert("请填入 Key 和词语");
             
-            // 构造完整的 API 地址
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            resDiv.innerText = "正在向 Google 请求中...";
+            
+            // 使用最简洁、完全不换行的 URL 构造
+            const base = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + key;
 
             try {
-                const response = await fetch(url, {
+                const response = await fetch(base, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: `你是一个创意助手。请根据词语 "${word}" 给出8个相关的发散词。要求：格式为"中文(英文)"，用逗号隔开，不要有任何多余的解释。` }] }]
-                    })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "给出8个和'" + word + "'相关的词，用逗号隔开" }] }] })
                 });
-
                 const data = await response.json();
-                
-                if (data.candidates && data.candidates[0]) {
-                    const aiText = data.candidates[0].content.parts[0].text;
-                    // 解析 AI 返回的文本
-                    const keywords = aiText.split(/[,，]/).map(s => s.trim());
-                    keywords.forEach((item, i) => {
-                        const angle = (i / keywords.length) * Math.PI * 2;
-                        const dist = 180; // 发散距离
+                if(data.candidates) {
+                    resDiv.innerHTML = "<h3>联想结果：</h3>" + data.candidates[0].content.parts[0].text;
+                } else {
+                    resDiv.innerText = "错误详情：" + JSON.stringify(data.error);
+                }
+            } catch (e) {
+                resDiv.innerText = "请求彻底失败，请检查是否开启了全局代理模式。";
+            }
+        }
+    </script>
+</body>
+</html>
