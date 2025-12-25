@@ -60,20 +60,34 @@
         async function spread(word, x, y) {
             if(!apiKey) return alert("请点击右下角🔑设置 Key！");
             document.getElementById('loader').style.display = 'block';
+            
+            // 修正后的标准网址格式
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
             try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts: [{ text: `给出8个和"${word}"相关的创意词,格式:中文(英文),用逗号隔开,不要解释` }] }] })
                 });
+
                 const data = await response.json();
-                const keywords = data.candidates[0].content.parts[0].text.split(/[,，]/).map(s => s.trim());
-                keywords.forEach((item, i) => {
-                    const angle = (i / keywords.length) * Math.PI * 2;
-                    const parts = item.split(/[()（）]/);
-                    addBubble(parts[0], parts[1] || "Idea", x + Math.cos(angle)*160, y + Math.sin(angle)*160);
-                });
-            } catch (e) { alert("出错啦，请检查 Key 或网络"); }
+                
+                if (data.candidates && data.candidates[0]) {
+                    const aiText = data.candidates[0].content.parts[0].text;
+                    const keywords = aiText.split(/[,，]/).map(s => s.trim());
+                    keywords.forEach((item, i) => {
+                        const angle = (i / keywords.length) * Math.PI * 2;
+                        const parts = item.split(/[()（）]/);
+                        addBubble(parts[0], parts[1] || "Idea", x + Math.cos(angle)*160, y + Math.sin(angle)*160);
+                    });
+                } else {
+                    alert("Gemini 返回了错误，请检查 Key 是否有效。");
+                }
+            } catch (e) { 
+                console.error(e);
+                alert("联想失败，可能是网络问题。"); 
+            }
             document.getElementById('loader').style.display = 'none';
         }
     </script>
